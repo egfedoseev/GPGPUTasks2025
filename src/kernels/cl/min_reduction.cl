@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION cl_khr_subgroups : enable
+
 #ifdef __CLION_IDE__
 #include <libgpu/opencl/cl/clion_defines.cl>
 #endif
@@ -11,24 +13,13 @@ __kernel void min_reduction(
     const uint n)
 {
     const uint i = get_global_id(0);
-    const uint localI = get_local_id(0);
+    const uint localI = get_sub_group_local_id();
 
-    __local float localBuf[GROUP_SIZE];
+    const float val = (i < n) ? input[i] : FLT_MAX;
 
-    if (i < n) {
-        localBuf[localI] = input[i];
-    } else {
-        localBuf[localI] = FLT_MAX;
-    }
-    barrier(CLK_LOCAL_MEM_FENCE);
+    const float mn = sub_group_reduce_min(val);
 
-    for (uint shift = GROUP_SIZE / 2; shift > 0; shift >>= 1) {
-        if (localI < shift) {
-            localBuf[localI] = fmin(localBuf[localI], localBuf[localI + shift]);
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
     if (localI == 0) {
-        output[get_group_id(0)] = localBuf[0];
+        output[get_sub_group_id() + get_group_id(0) * get_num_sub_groups()] = mn;
     }
 }

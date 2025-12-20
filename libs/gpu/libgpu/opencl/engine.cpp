@@ -829,6 +829,7 @@ OpenCLKernel *KernelSource::getKernel(const std::shared_ptr<OpenCLEngine> &cl, b
 		}
 
 		options += " -D WARP_SIZE=" + to_string(cl->wavefrontSize());
+		options += " -cl-std=CL2.0";
 
 		timer tm;
 		tm.start();

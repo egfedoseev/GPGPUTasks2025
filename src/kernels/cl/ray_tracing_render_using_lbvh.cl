@@ -36,11 +36,6 @@ static inline bool bvh_closest_hit(
     __private float* outU, // сюда нужно записать u рассчитанный в intersect_ray_triangle(..., t, u, v)
     __private float* outV) // сюда нужно записать v рассчитанный в intersect_ray_triangle(..., t, u, v)
 {
-    // const int rootIndex = 0;
-    // const int leafStart = (int)nfaces - 1;
-
-    // TODO implement BVH travering (with stack, don't use recursion)
-
     int stack[MAX_STACK_SIZE];
     int top = -1;
     int curIdx = 0;
@@ -103,13 +98,9 @@ static inline bool any_hit_from(
     uint nfaces,
     int ignore_face)
 {
-    // const int rootIndex = 0;
-    // const int leafStart = (int)nfaces - 1;
-
     const float tMin = 1e-4;
     float tMax = FLT_MAX;
-    // TODO implement BVH travering (with stack, don't use recursion)
-
+ 
     int stack[MAX_STACK_SIZE];
     int top = -1;
     int curIdx = 0;

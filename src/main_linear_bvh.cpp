@@ -70,11 +70,11 @@ void findMinMaxCoord(ocl::KernelSource& ocl_copy_array, ocl::KernelSource& ocl_m
     const unsigned int nfaces,
     float* res)
 {
-    ocl_copy_array.exec(gpu::WorkSize(GROUP_SIZE, nfaces), centroidsCoord, buff0, nfaces);
+    ocl_copy_array.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces), centroidsCoord, buff0, nfaces);
     uint sz = nfaces;
     while (sz > 1) {
-        ocl_minmax_reduction.exec(gpu::WorkSize(GROUP_SIZE, sz), buff0, buff1, sz);
-        sz = (sz + GROUP_SIZE - 1) / GROUP_SIZE;
+        ocl_minmax_reduction.exec(gpu::WorkSize(WAVEFRONT_SIZE, sz), buff0, buff1, sz);
+        sz = (sz + WAVEFRONT_SIZE - 1) / WAVEFRONT_SIZE;
         std::swap(buff0, buff1);
     }
     return buff0.readN(res, 1);
@@ -141,7 +141,7 @@ void run(int argc, char** argv)
         "data/powerplant/powerplant.obj",
         "data/san-miguel/san-miguel.obj",
     };
- 
+
     const int niters = 10; // при отладке удобно запускать одну итерацию
     std::vector<double> gpu_rt_perf_mrays_per_sec;
     std::vector<double> gpu_lbvh_perfs_mtris_per_sec;
@@ -213,7 +213,7 @@ void run(int argc, char** argv)
                 timer t;
 
                 ocl_rt_brute_force.exec(
-                    gpu::WorkSize(16, 16, width, height),
+                    gpu::WorkSize(GROUP_SIZE_X, GROUP_SIZE_Y, width, height),
                     vertices_gpu, faces_gpu,
                     framebuffer_face_id_gpu, framebuffer_ambient_occlusion_gpu,
                     camera_gpu.clmem(), nfaces);
@@ -268,7 +268,7 @@ void run(int argc, char** argv)
                 timer t;
 
                 ocl_rt_with_lbvh.exec(
-                    gpu::WorkSize(16, 16, width, height),
+                    gpu::WorkSize(GROUP_SIZE_X, GROUP_SIZE_Y, width, height),
                     vertices_gpu, faces_gpu,
                     lbvh_nodes_gpu.clmem(), leaf_faces_indices_gpu.clmem(),
                     framebuffer_face_id_gpu, framebuffer_ambient_occlusion_gpu,
@@ -331,7 +331,7 @@ void run(int argc, char** argv)
             for (int iter = 0; iter < niters; ++iter) {
                 timer t;
 
-                ocl_calc_centroids_aabb.exec(gpu::WorkSize(GROUP_SIZE, nfaces), vertices_gpu, faces_gpu, nfaces,
+                ocl_calc_centroids_aabb.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces), vertices_gpu, faces_gpu, nfaces,
                     triIndexes,
                     centroidsX, centroidsY, centroidsZ,
                     aabbXMin, aabbXMax, aabbYMin, aabbYMax, aabbZMin, aabbZMax);
@@ -344,7 +344,7 @@ void run(int argc, char** argv)
                 findMinMaxCoord(ocl_copy_array, ocl_min_reduction, centroidsZ, buff0, buff1, nfaces, &cZMin);
                 findMinMaxCoord(ocl_copy_array, ocl_max_reduction, centroidsZ, buff0, buff1, nfaces, &cZMax);
 
-                ocl_calc_morton.exec(gpu::WorkSize(GROUP_SIZE, nfaces),
+                ocl_calc_morton.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces),
                     centroidsX, centroidsY, centroidsZ,
                     aabbXMin, aabbXMax, aabbYMin, aabbYMax, aabbZMin, aabbZMax,
                     cXMin, cXMax, cYMin, cYMax, cZMin, cZMax,
@@ -354,22 +354,22 @@ void run(int argc, char** argv)
                 { // merge sort сортирует по коду Мортона, так что triIndex могут не совпадать с CPU реализацией
 
                     for (int sortedK = 1; sortedK < nfaces; sortedK *= 2) {
-                        ocl_merge_sort.exec(gpu::WorkSize(GROUP_SIZE, nfaces), triIndexes, mortonCodes.clmem(),
+                        ocl_merge_sort.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces), triIndexes, mortonCodes.clmem(),
                             triIndexesBuff, sortedK, nfaces);
                         std::swap(triIndexes, triIndexesBuff);
                     }
                 }
-                ocl_get_sorted_morton_codes.exec(gpu::WorkSize(GROUP_SIZE, nfaces),
+                ocl_get_sorted_morton_codes.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces),
                     triIndexes, mortonCodes.clmem(), nfaces, sortedCodes.clmem(),
                     aabbXMin, aabbXMax, aabbYMin, aabbYMax, aabbZMin, aabbZMax,
                     bvhNodes.clmem());
 
-                ocl_build_bvh.exec(gpu::WorkSize(GROUP_SIZE, nfaces - 1),
+                ocl_build_bvh.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces - 1),
                     sortedCodes.clmem(),
                     nfaces,
                     bvhNodes.clmem(), parents, counters);
 
-                ocl_calc_bvh_aabb.exec(gpu::WorkSize(GROUP_SIZE, nfaces), triIndexes,
+                ocl_calc_bvh_aabb.exec(gpu::WorkSize(WAVEFRONT_SIZE, nfaces), triIndexes,
                     aabbXMin, aabbXMax, aabbYMin, aabbYMax, aabbZMin, aabbZMax,
                     parents,
                     counters, bvhNodes.clmem(), nfaces);
@@ -392,7 +392,7 @@ void run(int argc, char** argv)
                 timer t;
 
                 ocl_rt_with_lbvh.exec(
-                    gpu::WorkSize(16, 16, width, height),
+                    gpu::WorkSize(GROUP_SIZE_X, GROUP_SIZE_Y, width, height),
                     vertices_gpu, faces_gpu,
                     bvhNodes.clmem(), triIndexes.clmem(),
                     framebuffer_face_id_gpu, framebuffer_ambient_occlusion_gpu,

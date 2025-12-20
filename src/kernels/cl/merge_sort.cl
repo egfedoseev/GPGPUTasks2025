@@ -7,9 +7,7 @@
 
 #include "../shared_structs/morton_code_gpu_shared.h"
 
-__attribute__((reqd_work_group_size(GROUP_SIZE, 1, 1)))
-__kernel void
-merge_sort(
+__kernel void merge_sort(
     __global const uint* triIndexes,
     __global const MortonCode* mortonCodes,
     __global uint* outputTriIndexes,
